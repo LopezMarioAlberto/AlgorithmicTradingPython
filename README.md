@@ -19,3 +19,12 @@
   * Pulling Data For Our Constituents
   * Calculating Weights
   * Generating Our Output File
+
+# Ameritrade API Stock Screener
+
+* Ameritrade API with Pandas and Python
+
+
+## Based on the courses developed by:
+* Nick McCullum (Algorithmic Trading Using Python)
+* Sam Focht from Python Basics (Ameritrade API Stock Screener)
