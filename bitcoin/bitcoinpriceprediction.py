@@ -20,10 +20,10 @@ import matplotlib.pyplot as plt
 import datetime as dt
 
 # Get the stock quote
-crypto_currency = 'BTC'
-against_currency = 'USD'
+crypto_currency = 'BTC'  # BTC
+against_currency = 'EUR'
 data_source ='yahoo'
-period = 60
+period = 20
 
 start = dt.datetime(2012, 1, 1)
 end = dt.datetime.now() - dt.timedelta(period + 1)
@@ -31,17 +31,73 @@ end = dt.datetime.now() - dt.timedelta(period + 1)
 ticket = f'{crypto_currency}-{against_currency}'
 
 df = web.DataReader(ticket, data_source=data_source, start=start, end=end)
-df.shape
 
-# Closing price history
+df.head()
+
+df.reset_index(inplace = True)
+df.set_index(["Date"])
+df.head()
+
+sma = df['Close'].rolling(window=period).mean()  # Simple moving average (SMA)
+std = df['Close'].rolling(window=period).std()  # Standard deviation
+df['Upper'] = sma + (std *2)  # Bollinger band
+df['Lower'] = sma - (std *2)  # Bollinger band
+
+df['Short'] = df.Close.ewm(span=20, adjust=False).mean()  # Exponential moving average
+df['Long'] = df.Close.ewm(span=50, adjust=False).mean()  # Exponential moving average
+
+df['20MA'] = df['Close'].rolling(window=20).mean()  # 20 moving average (20MA)
+df['50MA'] = df['Close'].rolling(window=50).mean()  # 50 moving average (50MA)
+
+shortema = df.Close.ewm(span=12, adjust=False).mean()  # Exponential moving average
+longema = df.Close.ewm(span=26, adjust=False).mean()  # Exponential moving average
+df['MACD'] = shortema - longema  # MACD
+df['Signal'] = df.MACD.ewm(span=9, adjust=False).mean()  # Exponential moving average
+
+df.head()
+
 plt.style.use('fivethirtyeight')
-
 plt.figure(figsize=(16, 8))
 plt.title('Close Price History')
-plt.plot(df['Close'])
+plt.plot(df['Date'], df['Close'], label='Close', color='blue')
+plt.plot(df['Date'], df['20MA'], label='20MA', color='black', dashes=[3, 2])
+plt.plot(df['Date'], df['50MA'], label='50MA', color='orange', dashes=[6, 2])
 plt.xlabel('Date', fontsize=18)
-plt.ylabel('Close Price USD', fontsize=18)
+plt.xticks(rotation = 45)
+plt.ylabel('Close Price', fontsize=18)
+plt.legend()
 plt.show()
+
+plt.style.use('fivethirtyeight')
+plt.figure(figsize=(16, 8))
+plt.title('Close Price MACD')
+plt.plot(df['Date'], df['MACD'], label='MACD', color='green')
+plt.plot(df['Date'], df['Signal'], label='Signal', color='purple', dashes=[3, 2])
+plt.axhline(y = 0, color = 'black', dashes=[1, 2])
+plt.xlabel('Date', fontsize=18)
+plt.xticks(rotation = 45)
+plt.ylabel('Close Price', fontsize=18)
+plt.legend()
+plt.show()
+
+plt.style.use('fivethirtyeight')
+fig = plt.figure(figsize=(16, 8))
+ax = fig.add_subplot(1,1,1)
+x_axis = df['Date']
+ax.fill_between(x_axis, df['Upper'], df['Lower'], color='silver')
+ax.plot(x_axis, df['Close'], color='gold', lw=3, label='Close Price')
+ax.set_title('Bolinger band')
+ax.set_xlabel('Date')
+ax.set_ylabel('USD Price ($)')
+plt.xticks(rotation = 45)
+ax.legend()
+plt.show()
+
+"""
+---
+
+## **Model**
+"""
 
 # Filtering with Close Column
 data = df.filter(['Close'])
@@ -53,8 +109,6 @@ training_data_len
 # Normalization
 scaler = MinMaxScaler(feature_range=(0,1))
 scaled_data = scaler.fit_transform(dataset)
-
-scaled_data
 
 # Creating Data set
 train_data = scaled_data[0:training_data_len, :]
@@ -73,15 +127,18 @@ x_train.shape
 
 # Building the model
 model = Sequential()
-model.add(LSTM(50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
-model.add(LSTM(50, return_sequences=False))
-model.add(Dense(25))
-model.add(Dense(1))
+
+model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
+model.add(LSTM(units=50, return_sequences=False))
+model.add(Dense(units=50))
+model.add(Dense(units=1))
+
 
 model.compile(optimizer='adam', loss='mean_squared_error')
 
 # Train the model
 model.fit(x_train, y_train, batch_size=1, epochs=10)
+# model.fit(x_train, y_train, epochs=25, batch_size=32)
 
 # Testing Data Set
 test_data = scaled_data[training_data_len - period: , :]
@@ -119,7 +176,7 @@ plt.figure(figsize=(16, 8))
 plt.title('Model')
 plt.xlabel('Date', fontsize=18)
 plt.ylabel('Close Price USD', fontsize=18)
-plt.plot(train['Close'])
+# plt.plot(train['Close'])
 plt.plot(valid[['Close', 'Predictions']])
 plt.legend(['Train', 'Val', 'Predictions'], loc='lower right')
 plt.show()
@@ -178,3 +235,4 @@ pred_price = scaler.inverse_transform(pred_price)
 pred_price = round(float(pred_price[0][0]), 6)
 
 print(f'Predicted price: ${pred_price}')
+
